@@ -413,11 +413,20 @@ tr:hover td{background:var(--goldpale);}
   <div class="card" id="activate-project-card" style="border-left:4px solid var(--gold);margin-bottom:20px;">
     <div class="card-title">🚀 Activate Project</div>
     <div class="card-sub">Set the active estimate — auto-fills Estimate No. &amp; Work Name across all pages</div>
-    <div class="grid2">
-      <div class="fg"><label>Estimate No.<span class="req">*</span></label><input type="text" id="ap-estno" placeholder="e.g. MEED-07/2024-25"></div>
-      <div class="fg"><label>Name of Work<span class="req">*</span></label><input type="text" id="ap-work" placeholder="Full description of work"></div>
+    <div style="margin-bottom:18px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--ink2);">Select Existing Project</div>
+      <select id="project-select" onchange="if(this.value)selectProject(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius2);font-size:14px;background:var(--paper);color:var(--ink);">
+        <option value="">-- Select Project --</option>
+      </select>
     </div>
-    <div class="btn-row"><button class="btn btn-gold" onclick="activateProject()">⚡ Activate Project</button><button class="btn btn-outline btn-sm" onclick="deactivateProject()">✕ Clear</button></div>
+    <div style="margin-top:18px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--ink2);">Create New Project</div>
+      <div class="grid2">
+        <div class="fg"><label>Estimate No.<span class="req">*</span></label><input type="text" id="ap-estno" placeholder="e.g. MEED-07/2024-25"></div>
+        <div class="fg"><label>Name of Work<span class="req">*</span></label><input type="text" id="ap-work" placeholder="Full description of work"></div>
+      </div>
+      <div class="btn-row"><button class="btn btn-gold" onclick="activateProject()">⚡ Activate Project</button><button class="btn btn-outline btn-sm" onclick="deactivateProject()">✕ Clear</button></div>
+    </div>
   </div>
 
   <!-- PROGRESS TRACKER -->
@@ -1247,7 +1256,11 @@ function T(){return TENDERS[ACTIVE_TENDER]||{};}
 function Bs(){return BIDDERS[ACTIVE_TENDER]||[];}
 function cfg(k,def){return CFG[k]||def||'';}
 function bdg(v){if(!v||v==='—')return'<span class="bdg bdg-b">—</span>';const m={'Responsive':'bdg-g','Meets':'bdg-g','Yes':'bdg-g','Received':'bdg-g','Non-Responsive':'bdg-r','Does Not Meet':'bdg-r','No':'bdg-r','Clarification Needed':'bdg-y','Pending Clarification':'bdg-y','Pending':'bdg-y','Exempted-MSME':'bdg-b','Exempted-Startup':'bdg-b'};return`<span class="bdg ${m[v]||'bdg-b'}">${v}</span>`;}
-function requireActiveProject(){if(!localStorage.getItem('activeProject')){showToast('⚠️ Please activate project first');return false;}return true;}
+function requireActiveProject(){
+  var project=JSON.parse(localStorage.getItem('activeProject')||'null');
+  if(!project){showToast('⚠️ Please select or create a project first');return false;}
+  return true;
+}
 function showToast(msg='✅ Copied!'){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 function copyDoc(id){
@@ -1307,7 +1320,7 @@ function go(id){
   if(pg)pg.classList.add('active');
   document.querySelectorAll('.nav').forEach(n=>{if(n.getAttribute('onclick')?.includes("'"+id+"'"))n.classList.add('active');});
   // Side effects
-  if(id==='dashboard')renderDashboard();
+  if(id==='dashboard'){renderDashboard();populateProjectSelect();}
   if(id==='ai-scrutiny'){populateAIBidders();updateProviderBadge();}
   if(id==='clar-letters')renderClarChips();
   if(id==='shortfall')renderShortfall();
@@ -3206,8 +3219,54 @@ function saveProjectToList(project){
 function getAllProjects(){
   return JSON.parse(localStorage.getItem('projectList')||'[]');
 }
+function populateProjectSelect(){
+  var sel=document.getElementById('project-select');
+  if(!sel)return;
+  var projects=getAllProjects();
+  sel.innerHTML='<option value="">-- Select Project --</option>';
+  projects.forEach(function(p){
+    var opt=document.createElement('option');
+    opt.value=p.estNo;
+    opt.textContent=p.estNo+' - '+p.workName;
+    sel.appendChild(opt);
+  });
+  var active=JSON.parse(localStorage.getItem('activeProject')||'null');
+  if(active&&active.estNo)sel.value=active.estNo;
+}
+function updateActiveProjectUI(){
+  updateActiveProjectBar();
+}
+function autoFillProjectData(){
+  var project=JSON.parse(localStorage.getItem('activeProject')||'null');
+  if(!project)return;
+  // Estimate Page
+  var eNo=document.getElementById('e-no');
+  var eWork=document.getElementById('e-work');
+  // Tender Page
+  var tEst=document.getElementById('t-estno');
+  // Fill only if empty
+  if(eNo&&!eNo.value)eNo.value=project.estNo;
+  if(eWork&&!eWork.value)eWork.value=project.workName;
+  if(tEst&&!tEst.value)tEst.value=project.estNo;
+  // Also propagate via AP fill system
+  AP_FIELDS.forEach(function(f){delete AP_FILL_MAP[f[0]];});
+  applyActiveProjectFill();
+}
+function selectProject(estNo){
+  var projects=getAllProjects();
+  var p=projects.find(function(x){return x.estNo===estNo;});
+  if(!p)return;
+  ACTIVE_PROJECT={estno:p.estNo,work:p.workName};
+  localStorage.setItem('mbpa_active_project',JSON.stringify(ACTIVE_PROJECT));
+  localStorage.setItem('activeProject',JSON.stringify({estNo:p.estNo,workName:p.workName,createdAt:p.createdAt}));
+  addEstimateToList(p.estNo,p.workName);
+  refreshEstimateDropdowns(p.estNo);
+  updateActiveProjectUI();
+  autoFillProjectData();
+  showToast('✅ Project activated: '+p.estNo);
+}
 function activateProject(){const estno=document.getElementById('ap-estno')?.value.trim();const work=document.getElementById('ap-work')?.value.trim();if(!estno||!work){alert('Enter Estimate No. and Work Name');return;}ACTIVE_PROJECT={estno,work};localStorage.setItem('mbpa_active_project',JSON.stringify(ACTIVE_PROJECT));localStorage.setItem('activeProject',JSON.stringify({estNo:estno,workName:work,createdAt:new Date().toISOString()}));saveProjectToList({estNo:estno,workName:work,createdAt:new Date().toISOString()});addEstimateToList(estno,work);// Reset fill map so new project values always propagate
-AP_FIELDS.forEach(([id])=>{delete AP_FILL_MAP[id];});refreshEstimateDropdowns(estno);updateActiveProjectBar();showToast('✅ Project activated: '+estno);}
+AP_FIELDS.forEach(([id])=>{delete AP_FILL_MAP[id];});refreshEstimateDropdowns(estno);updateActiveProjectBar();populateProjectSelect();autoFillProjectData();showToast('✅ Project activated: '+estno);}
 function deactivateProject(){ACTIVE_PROJECT=null;localStorage.removeItem('mbpa_active_project');localStorage.removeItem('activeProject');updateActiveProjectBar();showToast('Project deactivated');}
 function updateActiveProjectBar(){const bar=document.getElementById('active-project-bar');const bt=document.getElementById('ap-bar-text');if(!ACTIVE_PROJECT?.estno){const ap=JSON.parse(localStorage.getItem('activeProject')||'null');if(ap?.estNo){ACTIVE_PROJECT={estno:ap.estNo,work:ap.workName};}}if(ACTIVE_PROJECT?.estno){if(bar)bar.style.display='block';if(bt)bt.textContent=ACTIVE_PROJECT.estno+' - '+ACTIVE_PROJECT.work;if(!localStorage.getItem('activeProject'))localStorage.setItem('activeProject',JSON.stringify({estNo:ACTIVE_PROJECT.estno,workName:ACTIVE_PROJECT.work,createdAt:new Date().toISOString()}));applyActiveProjectFill();}else{if(bar)bar.style.display='none';}}
 
@@ -3375,6 +3434,18 @@ function genBudgetaryEnquiry(){if(!requireActiveProject())return;const eno=docum
   const mb=document.getElementById('mute-btn');if(mb)mb.textContent=MUTE_SOUND?'🔇':'🔊';
 })();
 
+// ══ SOFT LOCK ══
+function wrapWithProjectCheck(fnName){
+  var originalFn=window[fnName];
+  if(!originalFn)return;
+  window[fnName]=function(){
+    if(!requireActiveProject())return;
+    return originalFn.apply(this,arguments);
+  };
+}
+['addEstRow','saveTender','genEstimateDoc','genBudgetaryEnquiry','uploadDocument']
+  .forEach(wrapWithProjectCheck);
+
 // ════════════════════════════════════════════════════
 // INIT — Load saved settings on startup
 // ════════════════════════════════════════════════════
@@ -3391,7 +3462,21 @@ function genBudgetaryEnquiry(){if(!requireActiveProject())return;const eno=docum
     const t=TENDERS[ACTIVE_TENDER];
     Object.entries(t).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
   }
+  // Populate project dropdown and restore active selection
+  populateProjectSelect();
+  // Project dropdown change listener
+  var _psel=document.getElementById('project-select');
+  if(_psel){
+    _psel.addEventListener('change',function(){
+      var estNo=this.value;
+      if(estNo)selectProject(estNo);
+    });
+  }
+  // Auto-fill project data on load
+  autoFillProjectData();
 })();
+// DOMContentLoaded fallback (for early-script contexts)
+window.addEventListener('DOMContentLoaded',function(){autoFillProjectData();});
 </script>
 </body>
 </html>
