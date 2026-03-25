@@ -3237,6 +3237,18 @@ function updateActiveProjectUI(){
   updateActiveProjectBar();
 }
 function autoFillProjectData(){
+  var project=JSON.parse(localStorage.getItem('activeProject')||'null');
+  if(!project)return;
+  // Estimate Page
+  var eNo=document.getElementById('e-no');
+  var eWork=document.getElementById('e-work');
+  // Tender Page
+  var tEst=document.getElementById('t-estno');
+  // Fill only if empty
+  if(eNo&&!eNo.value)eNo.value=project.estNo;
+  if(eWork&&!eWork.value)eWork.value=project.workName;
+  if(tEst&&!tEst.value)tEst.value=project.estNo;
+  // Also propagate via AP fill system
   AP_FIELDS.forEach(function(f){delete AP_FILL_MAP[f[0]];});
   applyActiveProjectFill();
 }
@@ -3254,7 +3266,7 @@ function selectProject(estNo){
   showToast('✅ Project activated: '+p.estNo);
 }
 function activateProject(){const estno=document.getElementById('ap-estno')?.value.trim();const work=document.getElementById('ap-work')?.value.trim();if(!estno||!work){alert('Enter Estimate No. and Work Name');return;}ACTIVE_PROJECT={estno,work};localStorage.setItem('mbpa_active_project',JSON.stringify(ACTIVE_PROJECT));localStorage.setItem('activeProject',JSON.stringify({estNo:estno,workName:work,createdAt:new Date().toISOString()}));saveProjectToList({estNo:estno,workName:work,createdAt:new Date().toISOString()});addEstimateToList(estno,work);// Reset fill map so new project values always propagate
-AP_FIELDS.forEach(([id])=>{delete AP_FILL_MAP[id];});refreshEstimateDropdowns(estno);updateActiveProjectBar();populateProjectSelect();showToast('✅ Project activated: '+estno);}
+AP_FIELDS.forEach(([id])=>{delete AP_FILL_MAP[id];});refreshEstimateDropdowns(estno);updateActiveProjectBar();populateProjectSelect();autoFillProjectData();showToast('✅ Project activated: '+estno);}
 function deactivateProject(){ACTIVE_PROJECT=null;localStorage.removeItem('mbpa_active_project');localStorage.removeItem('activeProject');updateActiveProjectBar();showToast('Project deactivated');}
 function updateActiveProjectBar(){const bar=document.getElementById('active-project-bar');const bt=document.getElementById('ap-bar-text');if(!ACTIVE_PROJECT?.estno){const ap=JSON.parse(localStorage.getItem('activeProject')||'null');if(ap?.estNo){ACTIVE_PROJECT={estno:ap.estNo,work:ap.workName};}}if(ACTIVE_PROJECT?.estno){if(bar)bar.style.display='block';if(bt)bt.textContent=ACTIVE_PROJECT.estno+' - '+ACTIVE_PROJECT.work;if(!localStorage.getItem('activeProject'))localStorage.setItem('activeProject',JSON.stringify({estNo:ACTIVE_PROJECT.estno,workName:ACTIVE_PROJECT.work,createdAt:new Date().toISOString()}));applyActiveProjectFill();}else{if(bar)bar.style.display='none';}}
 
@@ -3460,7 +3472,11 @@ function wrapWithProjectCheck(fnName){
       if(estNo)selectProject(estNo);
     });
   }
+  // Auto-fill project data on load
+  autoFillProjectData();
 })();
+// DOMContentLoaded fallback (for early-script contexts)
+window.addEventListener('DOMContentLoaded',function(){autoFillProjectData();});
 </script>
 </body>
 </html>
