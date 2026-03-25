@@ -3226,6 +3226,15 @@ function populateProjectSelect(){
     opt.textContent=p.estNo+' - '+p.workName;
     sel.appendChild(opt);
   });
+  var active=JSON.parse(localStorage.getItem('activeProject')||'null');
+  if(active&&active.estNo)sel.value=active.estNo;
+}
+function updateActiveProjectUI(){
+  updateActiveProjectBar();
+}
+function autoFillProjectData(){
+  AP_FIELDS.forEach(function(f){delete AP_FILL_MAP[f[0]];});
+  applyActiveProjectFill();
 }
 function selectProject(estNo){
   var projects=getAllProjects();
@@ -3235,9 +3244,9 @@ function selectProject(estNo){
   localStorage.setItem('mbpa_active_project',JSON.stringify(ACTIVE_PROJECT));
   localStorage.setItem('activeProject',JSON.stringify({estNo:p.estNo,workName:p.workName,createdAt:p.createdAt}));
   addEstimateToList(p.estNo,p.workName);
-  AP_FIELDS.forEach(function(f){delete AP_FILL_MAP[f[0]];});
   refreshEstimateDropdowns(p.estNo);
-  updateActiveProjectBar();
+  updateActiveProjectUI();
+  autoFillProjectData();
   showToast('✅ Project activated: '+p.estNo);
 }
 function activateProject(){const estno=document.getElementById('ap-estno')?.value.trim();const work=document.getElementById('ap-work')?.value.trim();if(!estno||!work){alert('Enter Estimate No. and Work Name');return;}ACTIVE_PROJECT={estno,work};localStorage.setItem('mbpa_active_project',JSON.stringify(ACTIVE_PROJECT));localStorage.setItem('activeProject',JSON.stringify({estNo:estno,workName:work,createdAt:new Date().toISOString()}));saveProjectToList({estNo:estno,workName:work,createdAt:new Date().toISOString()});addEstimateToList(estno,work);// Reset fill map so new project values always propagate
@@ -3424,6 +3433,16 @@ function genBudgetaryEnquiry(){if(!requireActiveProject())return;const eno=docum
   if(ACTIVE_TENDER&&TENDERS[ACTIVE_TENDER]){
     const t=TENDERS[ACTIVE_TENDER];
     Object.entries(t).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
+  }
+  // Populate project dropdown and restore active selection
+  populateProjectSelect();
+  // Project dropdown change listener
+  var _psel=document.getElementById('project-select');
+  if(_psel){
+    _psel.addEventListener('change',function(){
+      var estNo=this.value;
+      if(estNo)selectProject(estNo);
+    });
   }
 })();
 </script>
