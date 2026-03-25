@@ -3471,6 +3471,33 @@ function genBudgetaryEnquiry(){if(!requireActiveProject())return;const eno=docum
   <h3 style="margin: 0 0 4px 0; font-size: 18px; color: #2D3436;">AI Estimate Assistant</h3>
   <p style="margin: 0 0 12px 0; font-size: 12px; color: #7a6e5f;">Generate BOQ using SOR and uploaded documents</p>
   
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+    <select id="ai-work-type" style="padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px;">
+      <option value="">Work Type</option>
+      <option value="Civil">Civil</option>
+      <option value="Electrical">Electrical</option>
+      <option value="HVAC">HVAC</option>
+      <option value="Plumbing">Plumbing</option>
+    </select>
+    <select id="ai-sub-work" style="padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px;">
+      <option value="">Sub Work</option>
+    </select>
+    <select id="ai-spec-level" style="padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px;">
+      <option value="">Spec Level</option>
+      <option value="Basic">Basic</option>
+      <option value="Standard">Standard</option>
+      <option value="Detailed (CPWD style)">Detailed (CPWD style)</option>
+    </select>
+    <select id="ai-sor-type" style="padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px;">
+      <option value="">SOR Type</option>
+      <option value="CPWD">CPWD</option>
+      <option value="PWD">PWD</option>
+      <option value="Custom">Custom</option>
+    </select>
+  </div>
+  
+  <button class="btn btn-outline btn-sm" onclick="buildAIPrompt()" style="margin-bottom: 12px;">🔧 Build Prompt</button>
+  
   <textarea id="ai-est-prompt" placeholder="Describe the work to generate estimate items..." style="width: 100%; min-height: 100px; border-radius: 8px; padding: 10px; border: 1px solid #ccc; font-family: 'Source Sans 3', sans-serif; font-size: 14px; resize: vertical;"></textarea>
   
   <div style="margin-top: 8px; font-size: 11px; color: #7a6e5f;" id="char-counter">0 / 500 characters</div>
@@ -3515,12 +3542,59 @@ function updateCharCounter() {
   }
 }
 
-// Attach counter update on input
+// ══ SMART PROMPT BUILDER ══
+const subWorkOptions = {
+  Civil: ['Plastering', 'Brickwork', 'RCC'],
+  Electrical: ['Wiring', 'Panels', 'Lighting'],
+  HVAC: ['Ducting', 'VRF System', 'Ventilation'],
+  Plumbing: ['Piping', 'Fixtures', 'Drainage']
+};
+
+function updateSubWork() {
+  const workType = document.getElementById('ai-work-type').value;
+  const subWorkSel = document.getElementById('ai-sub-work');
+  subWorkSel.innerHTML = '<option value="">Sub Work</option>';
+  if (workType && subWorkOptions[workType]) {
+    subWorkOptions[workType].forEach(sub => {
+      const opt = document.createElement('option');
+      opt.value = sub;
+      opt.textContent = sub;
+      subWorkSel.appendChild(opt);
+    });
+  }
+}
+
+function buildAIPrompt() {
+  const workType = document.getElementById('ai-work-type').value;
+  const subWork = document.getElementById('ai-sub-work').value;
+  const specLevel = document.getElementById('ai-spec-level').value;
+  const sorType = document.getElementById('ai-sor-type').value;
+  
+  if (!workType || !subWork || !specLevel || !sorType) {
+    showToast('Please select all fields to build prompt');
+    return;
+  }
+  
+  const prompt = `Prepare a detailed BOQ for ${workType} including ${subWork} with ${specLevel} specifications based on ${sorType}. Include all necessary items.`;
+  
+  const ta = document.getElementById('ai-est-prompt');
+  if (ta) {
+    ta.value = prompt;
+    updateCharCounter();
+  }
+}
+
+// Attach event listener for work type change
 document.addEventListener('DOMContentLoaded', function() {
   const ta = document.getElementById('ai-est-prompt');
   if (ta) {
     ta.addEventListener('input', updateCharCounter);
     updateCharCounter();
+  }
+  
+  const workTypeSel = document.getElementById('ai-work-type');
+  if (workTypeSel) {
+    workTypeSel.addEventListener('change', updateSubWork);
   }
 });
 
