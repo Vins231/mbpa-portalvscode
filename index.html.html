@@ -1256,7 +1256,11 @@ function T(){return TENDERS[ACTIVE_TENDER]||{};}
 function Bs(){return BIDDERS[ACTIVE_TENDER]||[];}
 function cfg(k,def){return CFG[k]||def||'';}
 function bdg(v){if(!v||v==='—')return'<span class="bdg bdg-b">—</span>';const m={'Responsive':'bdg-g','Meets':'bdg-g','Yes':'bdg-g','Received':'bdg-g','Non-Responsive':'bdg-r','Does Not Meet':'bdg-r','No':'bdg-r','Clarification Needed':'bdg-y','Pending Clarification':'bdg-y','Pending':'bdg-y','Exempted-MSME':'bdg-b','Exempted-Startup':'bdg-b'};return`<span class="bdg ${m[v]||'bdg-b'}">${v}</span>`;}
-function requireActiveProject(){if(!localStorage.getItem('activeProject')){showToast('⚠️ Please activate project first');return false;}return true;}
+function requireActiveProject(){
+  var project=JSON.parse(localStorage.getItem('activeProject')||'null');
+  if(!project){showToast('⚠️ Please select or create a project first');return false;}
+  return true;
+}
 function showToast(msg='✅ Copied!'){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 function copyDoc(id){
@@ -3417,6 +3421,18 @@ function genBudgetaryEnquiry(){if(!requireActiveProject())return;const eno=docum
   updateActiveProjectBar();
   const mb=document.getElementById('mute-btn');if(mb)mb.textContent=MUTE_SOUND?'🔇':'🔊';
 })();
+
+// ══ SOFT LOCK ══
+function wrapWithProjectCheck(fnName){
+  var originalFn=window[fnName];
+  if(!originalFn)return;
+  window[fnName]=function(){
+    if(!requireActiveProject())return;
+    return originalFn.apply(this,arguments);
+  };
+}
+['addEstRow','saveTender','genEstimateDoc','genBudgetaryEnquiry','uploadDocument']
+  .forEach(wrapWithProjectCheck);
 
 // ════════════════════════════════════════════════════
 // INIT — Load saved settings on startup
