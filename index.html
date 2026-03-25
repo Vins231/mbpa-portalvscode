@@ -300,6 +300,48 @@ tr:hover td{background:var(--goldpale);}
 #active-project-bar{position:sticky;top:79px;z-index:299;}
 /* AI Guide Panel */
 #ai-guide-btn{pointer-events:auto;}
+/* AI Panel Styles */
+.ai-panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  margin-bottom: 20px;
+}
+
+.ai-panel textarea {
+  width: 100%;
+  min-height: 100px;
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 14px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.ai-panel textarea:focus {
+  border-color: #C9A84C;
+}
+
+.ai-chip {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: #f1f3f5;
+  cursor: pointer;
+  margin: 4px;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.ai-chip:hover {
+  background: #C9A84C;
+  color: white;
+}
 </style>
 </head>
 <body>
@@ -3425,14 +3467,153 @@ function genBudgetaryEnquiry(){if(!requireActiveProject())return;const eno=docum
   const estCard=document.querySelector('#page-estimate .card');
   if(estCard&&!document.getElementById('est-ai-prompt')){
     const div=document.createElement('div');
-    div.style.cssText='margin-top:14px;display:flex;gap:10px;align-items:flex-start;';
-    div.innerHTML='<textarea id="est-ai-prompt" rows="2" placeholder="Describe work / generate estimate" style="flex:1;resize:vertical;"></textarea>'
-      +'<button class="btn btn-gold" onclick="generateEstimateViaAI()" style="white-space:nowrap;">🤖 Generate Estimate via AI</button>';
+    div.innerHTML=`<div class="ai-panel">
+  <h3 style="margin: 0 0 4px 0; font-size: 18px; color: #2D3436;">AI Estimate Assistant</h3>
+  <p style="margin: 0 0 12px 0; font-size: 12px; color: #7a6e5f;">Generate BOQ using SOR and uploaded documents</p>
+  
+  <textarea id="ai-est-prompt" placeholder="Describe the work to generate estimate items..." style="width: 100%; min-height: 100px; border-radius: 8px; padding: 10px; border: 1px solid #ccc; font-family: 'Source Sans 3', sans-serif; font-size: 14px; resize: vertical;"></textarea>
+  
+  <div style="margin-top: 8px; font-size: 11px; color: #7a6e5f;" id="char-counter">0 / 500 characters</div>
+  
+  <div style="margin-top: 12px;">
+    <span class="ai-chip" onclick="fillPrompt('Plastering Work')">Plastering Work</span>
+    <span class="ai-chip" onclick="fillPrompt('Electrical Wiring')">Electrical Wiring</span>
+    <span class="ai-chip" onclick="fillPrompt('HVAC Installation')">HVAC Installation</span>
+  </div>
+  
+  <div style="margin-top: 16px; display: flex; gap: 10px;">
+    <button id="gen-btn" class="btn btn-gold" onclick="generateEstimateViaAI()" style="flex: 1;">🤖 Generate Estimate</button>
+    <button class="btn btn-outline btn-sm" onclick="clearPrompt()">Clear</button>
+  </div>
+</div>`;
     estCard.appendChild(div);
   }
   updateActiveProjectBar();
   const mb=document.getElementById('mute-btn');if(mb)mb.textContent=MUTE_SOUND?'🔇':'🔊';
 })();
+
+// ══ AI PROMPT HELPERS ══
+function fillPrompt(text) {
+  const ta = document.getElementById('ai-est-prompt');
+  if (ta) ta.value = text;
+  updateCharCounter();
+}
+
+function clearPrompt() {
+  const ta = document.getElementById('ai-est-prompt');
+  if (ta) ta.value = '';
+  updateCharCounter();
+}
+
+function updateCharCounter() {
+  const ta = document.getElementById('ai-est-prompt');
+  const counter = document.getElementById('char-counter');
+  if (ta && counter) {
+    const len = ta.value.length;
+    counter.textContent = len + ' / 500 characters';
+    counter.style.color = len > 450 ? '#C9A84C' : '#7a6e5f';
+  }
+}
+
+// Attach counter update on input
+document.addEventListener('DOMContentLoaded', function() {
+  const ta = document.getElementById('ai-est-prompt');
+  if (ta) {
+    ta.addEventListener('input', updateCharCounter);
+    updateCharCounter();
+  }
+});
+
+// ══ ESTIMATE GENERATION ENGINE ══
+function generateEstimateViaAI() {
+    const promptEl = document.getElementById('ai-est-prompt');
+    if (!promptEl) {
+        showToast('Prompt input not found');
+        return;
+    }
+    const prompt = promptEl.value.trim();
+    if (!prompt) {
+        showToast('Enter a prompt first');
+        return;
+    }
+
+    // Show loading
+    const btn = document.getElementById('gen-btn');
+    if (btn) {
+        btn.textContent = 'Generating...';
+        btn.disabled = true;
+    }
+
+    // Get SOR data (assuming it's stored in a global or localStorage)
+    const sorData = JSON.parse(localStorage.getItem('sorData') || '[]');
+    // Get documents (optional for context)
+    const docs = JSON.parse(localStorage.getItem('documents') || '[]');
+
+    // Parse prompt into keywords (basic split)
+    const keywords = prompt.toLowerCase().split(/\s+/);
+
+    // Find matching SOR items
+    const matches = [];
+    sorData.forEach(item => {
+        const itemText = (item.code + ' ' + item.desc).toLowerCase();
+        const score = keywords.filter(k => itemText.includes(k)).length;
+        if (score > 0) {
+            matches.push({ item, score });
+        }
+    });
+
+    // Sort by score descending
+    matches.sort((a, b) => b.score - a.score);
+
+    // Take top matches (limit to 10 or so)
+    const topMatches = matches.slice(0, 10);
+
+    // For each match, add row
+    topMatches.forEach(({ item }) => {
+        const rowId = addEstRow(); // Assuming addEstRow returns the new row ID
+        // Fill fields
+        const descEl = document.getElementById(rowId + '-desc');
+        const unitEl = document.getElementById(rowId + '-unit');
+        const rateEl = document.getElementById(rowId + '-rate');
+        if (descEl) descEl.value = item.desc;
+        if (unitEl) unitEl.value = item.unit;
+        if (rateEl) rateEl.value = item.rate;
+        // Mark as SOR (default)
+    });
+
+    // If no matches or to add generic, create one generic item
+    if (topMatches.length === 0) {
+        const rowId = addEstRow();
+        const descEl = document.getElementById(rowId + '-desc');
+        const unitEl = document.getElementById(rowId + '-unit');
+        const rateEl = document.getElementById(rowId + '-rate');
+        if (descEl) descEl.value = 'Providing and fixing ' + prompt + ' complete as per specifications';
+        if (unitEl) unitEl.value = 'Nos'; // Default unit
+        if (rateEl) rateEl.value = '0'; // Non-SOR
+        // Mark as Non-SOR
+        const row = document.getElementById(rowId);
+        if (row) row.style.background = 'rgba(234,179,8,0.12)';
+        const codeEl = document.getElementById(rowId + '-code');
+        if (codeEl) {
+            codeEl.style.color = '#b45309';
+            codeEl.style.fontWeight = '700';
+            codeEl.title = 'Non-SOR: add rate manually';
+        }
+    }
+
+    // Recalculate totals
+    calcEst();
+
+    // Reset loading
+    setTimeout(() => {
+        if (btn) {
+            btn.textContent = '🤖 Generate Estimate';
+            btn.disabled = false;
+        }
+    }, 1000);
+
+    showToast('Estimate generated from prompt ✅');
+}
 
 // ══ SOFT LOCK ══
 function wrapWithProjectCheck(fnName){
