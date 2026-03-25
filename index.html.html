@@ -3195,7 +3195,18 @@ function applyActiveProjectFill(){
 
 // ══ ACTIVE PROJECT ══
 let ACTIVE_PROJECT=JSON.parse(localStorage.getItem('mbpa_active_project')||'null');
-function activateProject(){const estno=document.getElementById('ap-estno')?.value.trim();const work=document.getElementById('ap-work')?.value.trim();if(!estno||!work){alert('Enter Estimate No. and Work Name');return;}ACTIVE_PROJECT={estno,work};localStorage.setItem('mbpa_active_project',JSON.stringify(ACTIVE_PROJECT));localStorage.setItem('activeProject',JSON.stringify({estNo:estno,workName:work,createdAt:new Date().toISOString()}));addEstimateToList(estno,work);// Reset fill map so new project values always propagate
+// ══ PROJECT LIST ══
+function saveProjectToList(project){
+  var list=getAllProjects();
+  if(!list.some(function(p){return p.estNo===project.estNo;})){
+    list.push({estNo:project.estNo,workName:project.workName,createdAt:project.createdAt});
+    localStorage.setItem('projectList',JSON.stringify(list));
+  }
+}
+function getAllProjects(){
+  return JSON.parse(localStorage.getItem('projectList')||'[]');
+}
+function activateProject(){const estno=document.getElementById('ap-estno')?.value.trim();const work=document.getElementById('ap-work')?.value.trim();if(!estno||!work){alert('Enter Estimate No. and Work Name');return;}ACTIVE_PROJECT={estno,work};localStorage.setItem('mbpa_active_project',JSON.stringify(ACTIVE_PROJECT));localStorage.setItem('activeProject',JSON.stringify({estNo:estno,workName:work,createdAt:new Date().toISOString()}));saveProjectToList({estNo:estno,workName:work,createdAt:new Date().toISOString()});addEstimateToList(estno,work);// Reset fill map so new project values always propagate
 AP_FIELDS.forEach(([id])=>{delete AP_FILL_MAP[id];});refreshEstimateDropdowns(estno);updateActiveProjectBar();showToast('✅ Project activated: '+estno);}
 function deactivateProject(){ACTIVE_PROJECT=null;localStorage.removeItem('mbpa_active_project');localStorage.removeItem('activeProject');updateActiveProjectBar();showToast('Project deactivated');}
 function updateActiveProjectBar(){const bar=document.getElementById('active-project-bar');const bt=document.getElementById('ap-bar-text');if(!ACTIVE_PROJECT?.estno){const ap=JSON.parse(localStorage.getItem('activeProject')||'null');if(ap?.estNo){ACTIVE_PROJECT={estno:ap.estNo,work:ap.workName};}}if(ACTIVE_PROJECT?.estno){if(bar)bar.style.display='block';if(bt)bt.textContent=ACTIVE_PROJECT.estno+' - '+ACTIVE_PROJECT.work;if(!localStorage.getItem('activeProject'))localStorage.setItem('activeProject',JSON.stringify({estNo:ACTIVE_PROJECT.estno,workName:ACTIVE_PROJECT.work,createdAt:new Date().toISOString()}));applyActiveProjectFill();}else{if(bar)bar.style.display='none';}}
