@@ -3401,12 +3401,24 @@ async function downloadDoc(id){const docs=await idbGetAll();const doc=docs.find(
 
 // ══ AI ESTIMATE ASSISTANT ══
 async function generateEstimateViaAI(){
+  const btn = document.getElementById('gen-btn');
+  if(btn){
+    btn.textContent = '⏳ Generating...';
+    btn.disabled = true;
+  }
   if(!requireActiveProject())return;
   const promptEl=document.getElementById('est-ai-prompt');
   const txt=promptEl?.value?.trim();
   if(!txt){alert('Enter work description first');return;}
   const prov=ACTIVE_PROVIDER;
   if(!AI_CONFIGS[prov]?.key){alert('AI API key not configured.\nGo to Settings \u2192 AI Provider Configuration.');return;}
+  const activeProvider = localStorage.getItem('mbpa_active_provider') || 'gemini';
+  const key = localStorage.getItem(activeProvider + '_api_key') || localStorage.getItem('gemini_api_key') || localStorage.getItem('claude_api_key');
+  if (!key) {
+    showToast('⚠️ No API key configured. Go to Settings → AI Provider first.', 'warning');
+    go('settings');
+    return;
+  }
 
   // Fetch SOR documents from library
   const allDocs=await idbGetAll();
@@ -3492,7 +3504,15 @@ Rules: gst must be 12 or 18. rate=0 when sorCode is null.`;
     });
     calcEst();
     showToast(`✅ ${items.length} items — ${sorMatched} SOR matched, ${nonSOR} Non-SOR`);
+    if(btn){
+      btn.textContent = '🤖 Generate Estimate';
+      btn.disabled = false;
+    }
   }catch(e){alert('AI Error: '+e.message);}
+    if(btn){
+      btn.textContent = '🤖 Generate Estimate';
+      btn.disabled = false;
+    }
 }
 
 // ══ BUDGETARY ENQUIRY ══
